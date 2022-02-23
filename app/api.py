@@ -5,7 +5,7 @@ from collections import defaultdict
 import os
 
 from dotenv import load_dotenv, find_dotenv
-from controllers.asap import calculate_features
+from .controllers.asap import calculate_features, predict_asap
 from fastapi import FastAPI, Body
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
@@ -15,13 +15,17 @@ import uvicorn
 
 from app.models import (
     ENT_PROP_MAP,
+    GetFeaturesRequest,
     RecordsRequest,
     RecordsResponse,
     RecordsEntitiesByTypeResponse,
 )
-from app.spacy_extractor import SpacyExtractor
-from app.controllers.pdf import parse_pdf
-from app.controllers.asap import initialise_models
+from .spacy_extractor import SpacyExtractor
+from .controllers.pdf import parse_pdf
+from .controllers.asap import initialise_models
+import warnings
+
+warnings.filterwarnings("ignore")
 
 load_dotenv(find_dotenv())
 prefix = os.getenv("CLUSTER_ROUTE_PREFIX", "").rstrip("/")
@@ -52,8 +56,13 @@ def pdf_parse(path):
 '''
 Feature Generation
 '''
-def get_features(text):
-    return calculate_features(text)
+@app.post("/asap-features")
+def get_features(text: GetFeaturesRequest):
+    return calculate_features(text.text)
+
+@app.post("/feature-tensor")
+def get_features_tensor(text: GetFeaturesRequest):
+    return predict_asap(text.text, set_num='set3')
 
 # @app.get('/hierarchical-lstm-score')
 # def hierarchical_lstm_score(text):

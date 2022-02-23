@@ -7,6 +7,7 @@ from sklearn.model_selection import KFold, train_test_split
 from sklearn.preprocessing import PowerTransformer, QuantileTransformer
 
 from app.controllers.feature_generation import lemmatize
+from app.dataclass.arguments import ModelArguments
 
 from .tabular_torch_dataset import TorchTabularTextDataset
 from .data_utils import (
@@ -24,6 +25,8 @@ import torch
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 
+from transformers import AutoTokenizer
+
 logger = logging.getLogger(__name__)
 
 CATEGORICAL_ENCODE_TYPE = 'ohe'
@@ -31,7 +34,29 @@ EMPTY_TEXT_VALUES = ['nan', 'None']
 REPLACE_EMPTY_TEXT = None
 SEP_TEXT_TOKEN_STR = ' '
 
-def process_single_text(text, source, features, tokenizer, max_token_length=150, max_keyword_length=15, keywords=[]):
+def load_data_from_folder():
+    pass
+
+def load_data_into_folds():
+    pass
+
+def process_single_text(text, source, features, max_token_length=150, max_keyword_length=15, keywords=[]):
+    model_args = ModelArguments(
+        model_name_or_path='bert-base-uncased'
+    )
+
+    tokenizer_path_or_name = model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path
+    tokenizer = AutoTokenizer.from_pretrained(
+        tokenizer_path_or_name,
+        cache_dir=model_args.cache_dir,
+        max_sequence_length=150
+    )
+
+    #TODO: use pretrained tokenizer
+    glove_tokenizer = Tokenizer()
+    glove_tokenizer.fit_on_texts(keywords + [text])
+
+    print(features)
     if source == 'asap':
         categorical_cols = ['dummy_cat']
         text_cols = ['text']
@@ -47,9 +72,9 @@ def process_single_text(text, source, features, tokenizer, max_token_length=150,
 
         # calculate_features
         # features is a dictionary
-        data_df = pd.DataFrame(features)
+        data_df = pd.DataFrame(features, index=[0])
         data_df['text'] = text
-        data_df['lemmatized'] = ' '.join(lemmatize(text))
+        data_df['lemmatized'] = text
         # framework needs at least one categorical feature, but all ASAP-AES features are numerical
         data_df['dummy_cat'] = 1
 
@@ -57,6 +82,7 @@ def process_single_text(text, source, features, tokenizer, max_token_length=150,
                                                                     categorical_cols_func,
                                                                     numerical_cols_func,
                                                                     CATEGORICAL_ENCODE_TYPE)
+
         numerical_feats = normalize_numerical_feats(numerical_feats, transformer=None)
         agg_func = partial(agg_text_columns_func, EMPTY_TEXT_VALUES, REPLACE_EMPTY_TEXT)
         texts_cols = get_matching_cols(data_df, text_cols_func)
@@ -75,15 +101,15 @@ def process_single_text(text, source, features, tokenizer, max_token_length=150,
 
         hf_model_text_input = tokenizer(texts_list, padding="max_length", truncation=True,
                                         max_length=max_token_length)
+
         tokenized_text_ex = ' '.join(tokenizer.convert_ids_to_tokens(hf_model_text_input['input_ids'][0]))
         logger.debug(f'Tokenized text example: {tokenized_text_ex}')
 
-        answer_tokens = tokenizer.texts_to_sequences(texts_list)
+        answer_tokens = glove_tokenizer.texts_to_sequences(texts_list)
         answer_tokens = pad_sequences(answer_tokens, maxlen=max_token_length, padding='post', truncating='post')
 
-        answer_lemmatized_tokens = tokenizer.texts_to_sequences(lemmatized_texts_list)
+        answer_lemmatized_tokens = glove_tokenizer.texts_to_sequences(lemmatized_texts_list)
         answer_lemmatized_tokens = pad_sequences(answer_lemmatized_tokens, maxlen=max_token_length, padding='post', truncating='post')
-
         # create mask
         # change to lemmatized mask
         answer_mask = torch.zeros(answer_lemmatized_tokens.shape, dtype=torch.long)
@@ -91,14 +117,16 @@ def process_single_text(text, source, features, tokenizer, max_token_length=150,
         # FIXME: this is a hack to get the mask to work, I'm going to remove the part that makes it a tensor: answer_mask = torch.Tensor(answer_tokens)
         answer_mask.masked_fill_(torch.Tensor(answer_lemmatized_tokens) != 0, 1)
 
-        keyword_tokens = tokenizer.texts_to_sequences(keywords)
+        keyword_tokens = glove_tokenizer.texts_to_sequences(keywords)
         keyword_tokens = pad_sequences(keyword_tokens, maxlen=max_keyword_length, padding='post', truncating='post')
         keyword_tokens = torch.reshape(torch.from_numpy(keyword_tokens), (len(keywords), max_keyword_length))
         keyword_mask = torch.zeros(keyword_tokens.shape, dtype=torch.long)
         keyword_mask.masked_fill_(keyword_tokens != 0, 1)
 
         return TorchTabularTextDataset(hf_model_text_input, categorical_feats,
-                                    numerical_feats, answer_tokens, answer_mask, keyword_tokens, keyword_mask, None, data_df, None, texts=texts_list, lemmatized_answer_tokens=answer_lemmatized_tokens, lemmatized_answer_texts=lemmatized_texts_list)
+                                    numerical_feats, answer_tokens, answer_mask, keyword_tokens, keyword_mask, [0, 1, 2, 3], data_df, label_list=None, class_weights=None,
+                                    texts=texts_list,
+                                    lemmatized_answer_tokens=answer_lemmatized_tokens, lemmatized_answer_texts=lemmatized_texts_list)
 
 def load_data(data_df,
               text_cols,

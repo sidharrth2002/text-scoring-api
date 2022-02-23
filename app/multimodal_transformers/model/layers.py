@@ -54,7 +54,7 @@ class KeyAttention(nn.Module):
         self.M = None
         self.v = None
         self.bias = None
-        self.token_num_key = 16
+        self.token_num_key = 15
         self.token_num_ans = tabular_config.num_words
         self.mask_pad = True
         self.batch_size = batch_size

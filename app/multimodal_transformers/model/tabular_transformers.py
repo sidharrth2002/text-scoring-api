@@ -20,7 +20,7 @@ from transformers.models.longformer.modeling_longformer import LONGFORMER_INPUTS
 from transformers.models.xlm_roberta.modeling_xlm_roberta import XLMRobertaConfig
 from transformers.file_utils import add_start_docstrings
 
-from multimodal_transformers.model.layers import KeyAttention, LambdaLayer
+from .layers import KeyAttention, LambdaLayer
 
 from .tabular_combiner import TabularFeatCombiner
 from .tabular_config import TabularConfig

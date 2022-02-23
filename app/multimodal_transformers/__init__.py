@@ -1,5 +1,5 @@
-import multimodal_transformers.data
-import multimodal_transformers.model
+import app.multimodal_transformers.data
+import app.multimodal_transformers.model
 
 __version__ = '0.1.2-alpha'
 

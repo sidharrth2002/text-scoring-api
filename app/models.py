@@ -2,6 +2,8 @@
 # Licensed under the MIT License.
 
 from typing import Dict, List, Optional
+
+from matplotlib.pyplot import text
 from pydantic import BaseModel
 from pydantic.schema import schema
 
@@ -26,6 +28,8 @@ ENT_PROP_MAP = {
     "WORK_OF_ART": "worksOfArt",
 }
 
+class GetFeaturesRequest(BaseModel):
+    text: str
 
 class RecordDataRequest(BaseModel):
     text: str
