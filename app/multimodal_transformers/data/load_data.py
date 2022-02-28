@@ -34,13 +34,40 @@ EMPTY_TEXT_VALUES = ['nan', 'None']
 REPLACE_EMPTY_TEXT = None
 SEP_TEXT_TOKEN_STR = ' '
 
+def get_sequence_length(essay_set):
+    if essay_set=='set3':
+        return 150
+    elif essay_set=='set4':
+        return 150
+    elif essay_set=='set5':
+        return 512
+    elif essay_set=='set6':
+        return 300
+
+def get_token_num_for_keywords(group):
+    if group == 'set3':
+        return 15
+    elif group == 'set4':
+        return 15
+    elif group == 'set5':
+        return 13
+    elif group == 'set6':
+        return 10
+    elif group == 'practice-a':
+        return 15
+    elif group == 'practice-b':
+        return 15
+
 def load_data_from_folder():
     pass
 
 def load_data_into_folds():
     pass
 
-def process_single_text(text, source, features, max_token_length=150, max_keyword_length=15, keywords=[]):
+def process_single_text(text, source, features, keywords=[], essay_set='set3'):
+    max_token_length = get_sequence_length(essay_set)
+    max_keyword_length = get_token_num_for_keywords(essay_set)
+
     model_args = ModelArguments(
         model_name_or_path='bert-base-uncased'
     )
@@ -49,12 +76,14 @@ def process_single_text(text, source, features, max_token_length=150, max_keywor
     tokenizer = AutoTokenizer.from_pretrained(
         tokenizer_path_or_name,
         cache_dir=model_args.cache_dir,
-        max_sequence_length=150
+        max_sequence_length=max_token_length
     )
 
     #TODO: use pretrained tokenizer
-    glove_tokenizer = Tokenizer()
-    glove_tokenizer.fit_on_texts(keywords + [text])
+    glove_tokenizer = Tokenizer(num_words=10000)
+    all_data = pd.read_csv('/Users/SidharrthNagappan/Documents/University/Second Year/FYP/code/Benchmarking/set4_features.csv')
+    glove_tokenizer.fit_on_texts(all_data['essay'].to_list())
+    # glove_tokenizer.fit_on_texts(keywords + [text])
 
     print(features)
     if source == 'asap':

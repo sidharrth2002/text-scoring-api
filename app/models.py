@@ -31,10 +31,13 @@ ENT_PROP_MAP = {
 class GetFeaturesRequest(BaseModel):
     text: str
 
+class PredictASAPRequest(BaseModel):
+    text: str
+    essay_set: str
+
 class RecordDataRequest(BaseModel):
     text: str
     language: str = "en"
-
 
 class RecordRequest(BaseModel):
     recordId: str

@@ -35,6 +35,7 @@ class TabularConfig:
                  add_attention_module=False,
                  batch_size=2,
                  num_words=150,
+                 group='set3',
                  **kwargs
                  ):
         self.mlp_division = mlp_division
@@ -56,3 +57,4 @@ class TabularConfig:
         self.add_attention_module = add_attention_module
         self.batch_size = batch_size
         self.num_words = num_words
+        self.group = group

@@ -3,6 +3,20 @@ import torch
 from torch.nn.parameter import Parameter
 import tensorflow.keras.backend as K
 
+def get_token_num_for_keywords(group):
+    if group == 'set3':
+        return 15
+    elif group == 'set4':
+        return 15
+    elif group == 'set5':
+        return 13
+    elif group == 'set6':
+        return 10
+    elif group == 'practice-a':
+        return 15
+    elif group == 'practice-b':
+        return 15
+
 # pytorch layer
 class KeyAttention(nn.Module):
     """
@@ -54,7 +68,7 @@ class KeyAttention(nn.Module):
         self.M = None
         self.v = None
         self.bias = None
-        self.token_num_key = 15
+        self.token_num_key = get_token_num_for_keywords(tabular_config.group)
         self.token_num_ans = tabular_config.num_words
         self.mask_pad = True
         self.batch_size = batch_size

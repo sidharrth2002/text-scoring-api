@@ -4,20 +4,20 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: spacy-extractor
+  name: text-scoring-api
   annotations:
     getambassador.io/config: |
       ---
       apiVersion: ambassador/v1
       kind: Mapping
-      name: spacy-extractor-mapping
+      name: text-scoring-api-mapping
       prefix: /spacy/
       service: spacy-extractor
       timeout_ms: 20000
       bypass_auth: true
 spec:
   selector:
-    app: spacy-extractor
+    app: text-scoring-api
   ports:
     - port: 80
       targetPort: http-api

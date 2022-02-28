@@ -1,7 +1,7 @@
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License.
+# Sidharrth Nagappan
 
 from collections import defaultdict
+from html import entities
 import os
 
 from dotenv import load_dotenv, find_dotenv
@@ -12,13 +12,13 @@ from starlette.responses import RedirectResponse
 import spacy
 import srsly
 import uvicorn
+import pickle
 
 from app.models import (
     ENT_PROP_MAP,
     GetFeaturesRequest,
-    RecordsRequest,
-    RecordsResponse,
-    RecordsEntitiesByTypeResponse,
+    PredictASAPRequest,
+    RecordDataRequest,
 )
 from .spacy_extractor import SpacyExtractor
 from .controllers.pdf import parse_pdf
@@ -40,7 +40,7 @@ app = FastAPI(
 nlp = spacy.load("en_core_web_sm")
 extractor = SpacyExtractor(nlp)
 
-models = initialise_models('/Users/SidharrthNagappan/Documents/University/Second Year/FYP/compute_engine_models/ASAP-AES')
+models = initialise_models('/Volumes/My Passport/University/Second Year/FYP/models/ASAP-AES')
 
 @app.get("/", include_in_schema=False)
 def docs_redirect():
@@ -60,9 +60,37 @@ Feature Generation
 def get_features(text: GetFeaturesRequest):
     return calculate_features(text.text)
 
-@app.post("/feature-tensor")
-def get_features_tensor(text: GetFeaturesRequest):
-    return predict_asap(text.text, set_num='set3')
+@app.post("/predict-asap-aes")
+def get_features_tensor(text: PredictASAPRequest):
+    results = predict_asap(text.text, set_num=text.essay_set)
+    with open('attentions/attentions.pickle', 'rb') as f:
+        attentions = pickle.load(f)
+        final = {}
+        for key in attentions:
+            final[key] = attentions[key].tolist()
+    return results
+
+@app.post(
+    "/named-entities", tags=["NER"]
+)
+async def extract_entities_by_type(data: RecordDataRequest):
+    """Extract Named Entities from a record.
+        This route can be used directly as a Cognitive Skill in Azure Search
+        For Documentation on integration with Azure Search, see here:
+        https://docs.microsoft.com/en-us/azure/search/cognitive-search-custom-skill-interface"""
+
+    entities_res = extractor.extract_entities([{"id": 0, "text": data.text}])
+    res = []
+
+    for er in entities_res:
+        groupby = defaultdict(list)
+        for ent in er["entities"]:
+            ent_prop = ENT_PROP_MAP[ent["label"]]
+            groupby[ent_prop].append(ent["name"])
+        res.append(groupby)
+
+    return res[0]
+
 
 # @app.get('/hierarchical-lstm-score')
 # def hierarchical_lstm_score(text):

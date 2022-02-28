@@ -4,7 +4,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: spacy-extractor
+  name: text-scoring-api
 spec:
   replicas: 3
   strategy:
@@ -12,10 +12,10 @@ spec:
   template:
     metadata:
       labels:
-        app: spacy-extractor
+        app: text-scoring-api
     spec:
       containers:
-      - name: spacy-extractor
+      - name: text-scoring-api
         image: yourContainerRegistryName.azurecr.io/spacyextractor
         imagePullPolicy: Always
         resources:
