@@ -35,6 +35,12 @@ class PredictASAPRequest(BaseModel):
     text: str
     essay_set: str
 
+class PredictionResponse(BaseModel):
+    eval_loss: float
+    eval_score: int
+    text: str
+    keywords: List[str] = []
+
 class RecordDataRequest(BaseModel):
     text: str
     language: str = "en"

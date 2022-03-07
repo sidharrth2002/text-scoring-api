@@ -28,3 +28,9 @@ def calc_classification_metrics(p: EvalPrediction):
     }
     # print(result)
     return result
+
+def get_score(p: EvalPrediction):
+  pred_label = np.argmax(p.predictions[0], axis=1)[0]
+  return {
+    "score": pred_label
+  }

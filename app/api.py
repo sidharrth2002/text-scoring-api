@@ -18,6 +18,7 @@ from app.models import (
     ENT_PROP_MAP,
     GetFeaturesRequest,
     PredictASAPRequest,
+    PredictionResponse,
     RecordDataRequest,
 )
 from .spacy_extractor import SpacyExtractor
@@ -60,15 +61,20 @@ Feature Generation
 def get_features(text: GetFeaturesRequest):
     return calculate_features(text.text)
 
-@app.post("/predict-asap-aes")
+@app.post("/predict-asap-aes", response_model=PredictionResponse)
 def get_features_tensor(text: PredictASAPRequest):
     results = predict_asap(text.text, set_num=text.essay_set)
-    with open('attentions/attentions.pickle', 'rb') as f:
-        attentions = pickle.load(f)
-        final = {}
-        for key in attentions:
-            final[key] = attentions[key].tolist()
+    print(results)
     return results
+
+@app.get("/word-level-attention")
+def get_pickle():
+    with open('attentions/attentions.pickle', 'rb') as f:
+        final = {}
+        attentions = pickle.load(f)
+        for key in attentions:
+            final[key] = attentions[key].cpu().detach().numpy().tolist()
+        return final['z_key']
 
 @app.post(
     "/named-entities", tags=["NER"]

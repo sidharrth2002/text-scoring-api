@@ -6,7 +6,7 @@ Block C = word-level-attention
 '''
 from tensorflow.keras.preprocessing.text import Tokenizer
 from app.controllers.get_keywords import get_keywords
-from app.controllers.metrics import calc_classification_metrics
+from app.controllers.metrics import calc_classification_metrics, get_score
 from app.multimodal_transformers.data.load_data import process_single_text
 from ..multimodal_transformers.model import AutoModelWithTabular
 from ..dataclass.arguments import ModelArguments
@@ -18,7 +18,7 @@ import numpy as np
 models = {}
 
 def initialise_models(folder):
-    essay_sets = ['set3', 'set4', 'set5', 'set6']
+    essay_sets = ['set6']
 
     for essay_set in essay_sets:
         model_args = ModelArguments(
@@ -28,7 +28,7 @@ def initialise_models(folder):
             model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         )
         config.tabular_config['save_attentions']=True
-        config.tabular_config['attentions_path']='./attentions/attentions.pkl'
+        config.tabular_config['attentions_path']='./attentions/attentions.pickle'
         config.tabular_config['group'] = essay_set
         models[essay_set] = AutoModelWithTabular.from_pretrained(
             model_args.config_name if model_args.config_name else model_args.model_name_or_path,
@@ -98,9 +98,13 @@ def predict_asap(text, set_num):
         args=training_args,
         train_dataset=inference_data,
         eval_dataset=inference_data,
-        compute_metrics=calc_classification_metrics,
+        compute_metrics=get_score,
     )
 
     results = trainer.evaluate()
+
+    results['text'] = data[0]['lemmatized_text']
+    # results['keyword_tokens'] = data[0]['keyword_tokens'].tolist()
+    results['keywords'] = get_keywords(set_num)
 
     return results
