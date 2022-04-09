@@ -149,7 +149,7 @@ def process_single_text(text, source, features, keywords=[], essay_set='set3'):
         answer_tokens = pad_sequences(answer_tokens, maxlen=max_token_length, padding='post', truncating='post')
 
         answer_lemmatized_tokens = glove_tokenizer.texts_to_sequences(lemmatized_texts_list)
-        answer_lemmatized_tokens = [[i for i in j if i < len(glove_tokenizer.word_index)] for j in answer_lemmatized_tokens]
+        # answer_lemmatized_tokens = [[i for i in j if i < len(glove_tokenizer.word_index)] for j in answer_lemmatized_tokens]
         answer_lemmatized_tokens = pad_sequences(answer_lemmatized_tokens, maxlen=max_token_length, padding='post', truncating='post')
         # create mask
         # change to lemmatized mask
