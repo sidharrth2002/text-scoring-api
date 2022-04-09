@@ -54,7 +54,7 @@ class KeyAttention(nn.Module):
                  word_att_pool='max',
                  merge_ans_key='concat',
                  beta=False,
-                 batch_size=32,
+                 batch_size=16,
                  tabular_config=None,
                  **kwargs):
         super(KeyAttention, self).__init__(**kwargs)
@@ -68,7 +68,7 @@ class KeyAttention(nn.Module):
         self.M = None
         self.v = None
         self.bias = None
-        self.token_num_key = get_token_num_for_keywords(tabular_config.group)
+        self.token_num_key = tabular_config.max_keyword_len
         self.token_num_ans = tabular_config.num_words
         self.mask_pad = True
         self.batch_size = batch_size

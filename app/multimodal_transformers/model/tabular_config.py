@@ -36,6 +36,7 @@ class TabularConfig:
                  batch_size=2,
                  num_words=150,
                  group='set3',
+                 max_keyword_len=10,
                  **kwargs
                  ):
         self.mlp_division = mlp_division
@@ -58,3 +59,4 @@ class TabularConfig:
         self.batch_size = batch_size
         self.num_words = num_words
         self.group = group
+        self.max_keyword_len = max_keyword_len

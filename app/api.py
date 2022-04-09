@@ -41,7 +41,7 @@ app = FastAPI(
 nlp = spacy.load("en_core_web_sm")
 extractor = SpacyExtractor(nlp)
 
-models = initialise_models('/Volumes/My Passport/University/Second Year/FYP/models/ASAP-AES')
+models = initialise_models('/Volumes/My Passport/FYP/ASAP-AES-models')
 
 @app.get("/", include_in_schema=False)
 def docs_redirect():

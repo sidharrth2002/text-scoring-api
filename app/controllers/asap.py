@@ -14,27 +14,33 @@ from transformers.models.auto.configuration_auto import AutoConfig
 from . import feature_generation
 from transformers import pipeline, Trainer, TrainingArguments
 import numpy as np
+import os
 
 models = {}
 
 def initialise_models(folder):
-    essay_sets = ['set6']
+    essay_sets = ['set3', 'set4', 'set5', 'set6']
 
     for essay_set in essay_sets:
+        fold = os.listdir(f"{folder}/{essay_set}")[0]
+        checkpoint = os.listdir(f"{folder}/{essay_set}/{fold}")[0]
+        model_path = f"{folder}/{essay_set}/{fold}/{checkpoint}"
         model_args = ModelArguments(
-           model_name_or_path=f'{folder}/{essay_set}'
+           model_name_or_path=model_path
         )
         config = AutoConfig.from_pretrained(
-            model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+            model_args.model_name_or_path,
+            # model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         )
         config.tabular_config['save_attentions']=True
         config.tabular_config['attentions_path']='./attentions/attentions.pickle'
         config.tabular_config['group'] = essay_set
+        config.tabular_config['max_keyword_len'] = max([len(i.split()) for i in get_keywords(essay_set)])
         models[essay_set] = AutoModelWithTabular.from_pretrained(
-            model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+            model_args.model_name_or_path,
+            # model_args.config_name if model_args.config_name else model_args.model_name_or_path,
             config=config,
         )
-        print(models[essay_set].embedding_layer)
         print(essay_set)
         print(config.tabular_config)
 
@@ -76,16 +82,16 @@ def predict_asap(text, set_num):
     data = process_single_text(text, 'asap', features, keywords=get_keywords(set_num), essay_set=set_num)
     inference_data = np.array([])
 
-    for i in range(32):
+    for i in range(16):
         inference_data = np.append(inference_data, data)
 
     training_args = TrainingArguments(
             output_dir='.',
             num_train_epochs = 4,
-            per_device_train_batch_size=32,
-            # gradient_accumulation_steps=16,
-            per_device_eval_batch_size=32,
-            # eval_accumulation_steps=4,
+            per_device_train_batch_size=16,
+            gradient_accumulation_steps=2,
+            per_device_eval_batch_size=16,
+            eval_accumulation_steps=2,
             evaluation_strategy = "epoch",
             save_total_limit = 1,
             disable_tqdm = False,

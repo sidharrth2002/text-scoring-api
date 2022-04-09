@@ -65,8 +65,18 @@ def load_data_into_folds():
     pass
 
 def process_single_text(text, source, features, keywords=[], essay_set='set3'):
-    max_token_length = get_sequence_length(essay_set)
-    max_keyword_length = get_token_num_for_keywords(essay_set)
+    all_data = pd.read_csv(f'app/data/asap-aes/training_set_rel3_features.tsv', sep='\t', encoding='ISO-8859-1', index_col=0)
+    all_data['essay'] = all_data['essay'].apply(lambda x: x.replace(r'/[^\w,.:;\[\]()/\!@#$%^&*+{}<>=?~|" -]/g', ''))
+    all_data['essay'] = all_data['essay'].apply(lambda x: x.replace(r'/\s+/g', ''))
+
+    max_token_length = int(all_data[all_data['essay_set'] == int(essay_set[-1])]['num_words'].max())
+
+    print('Max token length is ', max_token_length)
+
+    # means we are using ASAP-AES and not Bursa
+    if 'set' in essay_set:
+        max_keyword_length = max([len(i.split()) for i in keywords])
+        print('Max keyword length is ', max_keyword_length)
 
     model_args = ModelArguments(
         model_name_or_path='bert-base-uncased'
@@ -81,9 +91,10 @@ def process_single_text(text, source, features, keywords=[], essay_set='set3'):
 
     #TODO: use pretrained tokenizer
     glove_tokenizer = Tokenizer(num_words=10000)
-    all_data = pd.read_csv('/Users/SidharrthNagappan/Documents/University/Second Year/FYP/code/Benchmarking/set4_features.csv')
-    glove_tokenizer.fit_on_texts(all_data['essay'].to_list())
+    glove_tokenizer.fit_on_texts(all_data[all_data['essay_set'] == int(essay_set[-1])]['essay'].to_list() + keywords)
     # glove_tokenizer.fit_on_texts(keywords + [text])
+
+    print('Tokenizer vocab size is ', len(glove_tokenizer.word_index))
 
     print(features)
     if source == 'asap':
@@ -138,6 +149,7 @@ def process_single_text(text, source, features, keywords=[], essay_set='set3'):
         answer_tokens = pad_sequences(answer_tokens, maxlen=max_token_length, padding='post', truncating='post')
 
         answer_lemmatized_tokens = glove_tokenizer.texts_to_sequences(lemmatized_texts_list)
+        answer_lemmatized_tokens = [[i for i in j if i < len(glove_tokenizer.word_index)] for j in answer_lemmatized_tokens]
         answer_lemmatized_tokens = pad_sequences(answer_lemmatized_tokens, maxlen=max_token_length, padding='post', truncating='post')
         # create mask
         # change to lemmatized mask
