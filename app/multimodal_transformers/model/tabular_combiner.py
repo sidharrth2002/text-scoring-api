@@ -135,38 +135,20 @@ class TabularFeatCombiner(nn.Module):
             )
             self.final_out_dim = self.text_out_dim + output_dim + self.numerical_feat_dim
         elif self.combine_feat_method == 'mlp_on_concatenated_cat_and_numerical_feats_then_concat':
-            assert self.cat_feat_dim != 0, 'dimension of cat feats should not be 0'
-            assert self.numerical_feat_dim != 0, 'dimension of numerical feats should not be 0'
-
-            if self.tabular_config.add_attention_module:
-                # FIXME: remove self.cat_feat_dim from calc of output_dim because only one att
-                output_dim = min(self.numerical_feat_dim, tabular_config.keyword_MLP_out_dim, self.text_out_dim)
-                in_dim = self.cat_feat_dim + self.numerical_feat_dim + tabular_config.keyword_MLP_out_dim
-
-                dims = calc_mlp_dims(
-                    in_dim,
-                    self.mlp_division,
-                    output_dim
-                )
-                self.cat_and_numerical_mlp = MLP(
-                    in_dim,
-                    output_dim,
-                    act=self.mlp_act,
-                    num_hidden_lyr=len(dims),
-                    dropout_prob=self.mlp_dropout,
-                    hidden_channels=dims,
-                    return_layer_outs=False,
-                    bn=True
-                )
-                self.final_out_dim = self.text_out_dim + output_dim
-            else:
-                output_dim = min(self.numerical_feat_dim, self.text_out_dim)
+            if 'practice' in self.tabular_config.group:
+                print('in here')
+                assert self.cat_feat_dim != 0, 'dimension of cat feats should not be 0'
+                assert self.numerical_feat_dim != 0, 'dimension of numerical feats should not be 0'
+                output_dim = min(self.numerical_feat_dim, self.cat_feat_dim, self.text_out_dim)
                 in_dim = self.cat_feat_dim + self.numerical_feat_dim
                 dims = calc_mlp_dims(
                     in_dim,
                     self.mlp_division,
                     output_dim
                 )
+                print('Cat feat dim', self.cat_feat_dim)
+                print('Num feat dim', self.numerical_feat_dim)
+                print('Dims', dims)
                 self.cat_and_numerical_mlp = MLP(
                     in_dim,
                     output_dim,
@@ -177,7 +159,62 @@ class TabularFeatCombiner(nn.Module):
                     return_layer_outs=False,
                     bn=True
                 )
-                self.final_out_dim = self.text_out_dim + output_dim
+                if self.keyword_attention_dim is not None and self.keyword_attention_dim > 0:
+                    output_dim_num = self.keyword_attention_dim // (self.mlp_division // 2)
+                    self.keyword_MLP = MLP(
+                        self.keyword_attention_dim,
+                        output_dim_num,
+                        act=self.mlp_act,
+                        dropout_prob=self.mlp_dropout,
+                        num_hidden_lyr=1,
+                        return_layer_outs=False,
+                        bn=True
+                    )
+                self.final_out_dim = self.text_out_dim + output_dim + self.keyword_attention_dim
+            else:
+                assert self.cat_feat_dim != 0, 'dimension of cat feats should not be 0'
+                assert self.numerical_feat_dim != 0, 'dimension of numerical feats should not be 0'
+
+                if self.tabular_config.add_attention_module:
+                    # FIXME: remove self.cat_feat_dim from calc of output_dim because only one att
+                    output_dim = min(self.numerical_feat_dim, tabular_config.keyword_MLP_out_dim, self.text_out_dim)
+                    in_dim = self.cat_feat_dim + self.numerical_feat_dim + tabular_config.keyword_MLP_out_dim
+
+                    dims = calc_mlp_dims(
+                        in_dim,
+                        self.mlp_division,
+                        output_dim
+                    )
+                    self.cat_and_numerical_mlp = MLP(
+                        in_dim,
+                        output_dim,
+                        act=self.mlp_act,
+                        num_hidden_lyr=len(dims),
+                        dropout_prob=self.mlp_dropout,
+                        hidden_channels=dims,
+                        return_layer_outs=False,
+                        bn=True
+                    )
+                    self.final_out_dim = self.text_out_dim + output_dim
+                else:
+                    output_dim = min(self.numerical_feat_dim, self.text_out_dim)
+                    in_dim = self.cat_feat_dim + self.numerical_feat_dim
+                    dims = calc_mlp_dims(
+                        in_dim,
+                        self.mlp_division,
+                        output_dim
+                    )
+                    self.cat_and_numerical_mlp = MLP(
+                        in_dim,
+                        output_dim,
+                        act=self.mlp_act,
+                        num_hidden_lyr=len(dims),
+                        dropout_prob=self.mlp_dropout,
+                        hidden_channels=dims,
+                        return_layer_outs=False,
+                        bn=True
+                    )
+                    self.final_out_dim = self.text_out_dim + output_dim
         elif self.combine_feat_method == 'individual_mlps_on_cat_and_numerical_feats_then_concat':
             output_dim_cat = 0
             if self.cat_feat_dim > 0:
@@ -433,14 +470,25 @@ class TabularFeatCombiner(nn.Module):
             cat_feats = self.cat_mlp(cat_feats)
             combined_feats = torch.cat((text_feats, cat_feats, numerical_feats), dim=1)
         elif self.combine_feat_method == 'mlp_on_concatenated_cat_and_numerical_feats_then_concat':
-            if self.tabular_config.add_attention_module:
-                tabular_feats = torch.cat((cat_feats, numerical_feats, keyword_feats), dim=1)
-                tabular_feats = self.cat_and_numerical_mlp(tabular_feats)
-                combined_feats = torch.cat((text_feats, tabular_feats), dim=1)
-            else:
+            if 'practice' in self.tabular_config.group:
                 tabular_feats = torch.cat((cat_feats, numerical_feats), dim=1)
                 tabular_feats = self.cat_and_numerical_mlp(tabular_feats)
-                combined_feats = torch.cat((text_feats, tabular_feats), dim=1)
+                if keyword_feats is not None:
+                    keyword_feats = self.keyword_MLP(keyword_feats)
+                    print('Keyword Feats Shape')
+                    print(keyword_feats.shape)
+                    combined_feats = torch.cat((text_feats, tabular_feats, keyword_feats), dim=1)
+                else:
+                    combined_feats = torch.cat((text_feats, tabular_feats), dim=1)
+            else:
+                if self.tabular_config.add_attention_module:
+                    tabular_feats = torch.cat((cat_feats, numerical_feats, keyword_feats), dim=1)
+                    tabular_feats = self.cat_and_numerical_mlp(tabular_feats)
+                    combined_feats = torch.cat((text_feats, tabular_feats), dim=1)
+                else:
+                    tabular_feats = torch.cat((cat_feats, numerical_feats), dim=1)
+                    tabular_feats = self.cat_and_numerical_mlp(tabular_feats)
+                    combined_feats = torch.cat((text_feats, tabular_feats), dim=1)
 
         elif self.combine_feat_method == 'individual_mlps_on_cat_and_numerical_feats_then_concat':
             if self.tabular_config.add_attention_module:

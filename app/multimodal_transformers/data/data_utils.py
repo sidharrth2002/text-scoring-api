@@ -146,7 +146,7 @@ def load_cat_and_num_feats(df, cat_bool_func, num_bool_func, enocde_type=None):
 def load_cat_feats(df, cat_bool_func, encode_type=None):
     """load categorical features from DataFrame and do encoding if specified"""
     cat_cols = get_matching_cols(df, cat_bool_func)
-    logger.info(f'{len(cat_cols)} categorical columns')
+    print(f'{len(cat_cols)} categorical columns')
     if len(cat_cols) == 0:
         return None
     cat_feat_processor = CategoricalFeatures(df, cat_cols, encode_type)

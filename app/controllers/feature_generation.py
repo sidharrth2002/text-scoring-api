@@ -18,6 +18,11 @@ def num_words(text):
     doc = nlp(text)
     return len(doc)
 
+def num_WORDS(text):
+    # find number of words in text
+    doc = nlp(text)
+    return len(doc)
+
 def num_sentences(text):
     # find number of sentences in text
     doc = nlp(text)

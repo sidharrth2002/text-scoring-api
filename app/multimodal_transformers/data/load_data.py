@@ -3,6 +3,7 @@ import logging
 from os.path import join, exists
 
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import KFold, train_test_split
 from sklearn.preprocessing import PowerTransformer, QuantileTransformer
 
@@ -24,6 +25,7 @@ from torchtext.data import get_tokenizer
 import torch
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
+from itertools import cycle
 
 from transformers import AutoTokenizer
 
@@ -64,7 +66,7 @@ def load_data_from_folder():
 def load_data_into_folds():
     pass
 
-def process_single_text(text, source, features, keywords=[], essay_set='set3'):
+def process_single_text_asap(text, source, features, keywords=[], essay_set='set3'):
     all_data = pd.read_csv(f'app/data/asap-aes/training_set_rel3_features.tsv', sep='\t', encoding='ISO-8859-1', index_col=0)
     all_data['essay'] = all_data['essay'].apply(lambda x: x.replace(r'/[^\w,.:;\[\]()/\!@#$%^&*+{}<>=?~|" -]/g', ''))
     all_data['essay'] = all_data['essay'].apply(lambda x: x.replace(r'/\s+/g', ''))
@@ -114,7 +116,7 @@ def process_single_text(text, source, features, keywords=[], essay_set='set3'):
         # features is a dictionary
         data_df = pd.DataFrame(features, index=[0])
         data_df['text'] = text
-        data_df['lemmatized'] = text
+        data_df['lemmatized'] = ' '.join(lemmatize(text))
         # framework needs at least one categorical feature, but all ASAP-AES features are numerical
         data_df['dummy_cat'] = 1
 
@@ -168,6 +170,137 @@ def process_single_text(text, source, features, keywords=[], essay_set='set3'):
                                     numerical_feats, answer_tokens, answer_mask, keyword_tokens, keyword_mask, [0, 1, 2, 3], data_df, label_list=None, class_weights=None,
                                     texts=texts_list,
                                     lemmatized_answer_tokens=answer_lemmatized_tokens, lemmatized_answer_texts=lemmatized_texts_list)
+
+def merge_lists_alternatively(lst1, lst2):
+    return [sub[item] for item in range(len(lst2)) for sub in [lst1, lst2]]
+
+def process_single_text_bursa(text, source, features, keywords=[], essay_set='practice-a'):
+    practice = essay_set[-1]
+
+    glove_tokenizer = Tokenizer(num_words=10000)
+    if practice == 'a':
+        train = pd.read_csv('app/data/a/train.csv')
+        test = pd.read_csv('app/data/a/test.csv')
+        val = pd.read_csv('app/data/a/val.csv')
+
+        max_token_length = 700
+        print('Max token length is ', max_token_length)
+
+            #TODO: use pretrained tokenizer
+        glove_tokenizer.fit_on_texts(train['lemmatized'].tolist() + val['lemmatized'].tolist() + test['lemmatized'].tolist() + keywords)
+        # glove_tokenizer.fit_on_texts(keywords + [text])
+
+    elif practice == 'b':
+        train = pd.read_csv('app/data/b/train.csv', index_col=0)
+        test = pd.read_csv('app/data/b/test.csv', index_col=0)
+        print(train['lemmatized'])
+        print(test['lemmatized'])
+        max_token_length = 1024
+        glove_tokenizer.fit_on_texts([str(i) for i in train['lemmatized'].tolist()] + [str(i) for i in test['lemmatized'].tolist()] + keywords)
+
+    # means we are using ASAP-AES and not Bursa
+    max_keyword_length = max([len(i.split()) for i in keywords])
+    print('Max keyword length is ', max_keyword_length)
+
+    model_args = ModelArguments(
+        model_name_or_path='allenai/longformer-base-4096'
+    )
+
+    tokenizer_path_or_name = model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path
+    tokenizer = AutoTokenizer.from_pretrained(
+        tokenizer_path_or_name,
+        cache_dir=model_args.cache_dir,
+        max_sequence_length=max_token_length
+    )
+
+    print('Tokenizer vocab size is ', len(glove_tokenizer.word_index))
+
+    print(features)
+    categorical_cols = list(features['cat_cols'].keys())
+    text_cols = ['text']
+    numerical_cols = list(features['num_cols'].keys())
+
+    logger.info(f'Text columns: {text_cols}')
+    logger.info(f'Categorical columns: {categorical_cols}')
+    logger.info(f'Numerical columns: {numerical_cols}')
+
+    print('Categorical Feats', categorical_cols)
+    print('Numerical Feats', numerical_cols)
+
+    text_cols_func = convert_to_func(text_cols)
+    categorical_cols_func = convert_to_func(categorical_cols)
+    numerical_cols_func = convert_to_func(numerical_cols)
+
+    # calculate_features
+    # features is a dictionary
+    # double the fucking features
+    all_features = {**features['cat_cols'], **features['num_cols']}
+    data_df = pd.DataFrame(all_features, index=[0])
+    data_df['text'] = text
+    data_df['lemmatized'] = ' '.join(lemmatize(text))
+    # framework needs at least one categorical feature, but all ASAP-AES features are numerical
+
+    categorical_feats, numerical_feats = load_cat_and_num_feats(data_df,
+                                                                categorical_cols_func,
+                                                                numerical_cols_func,
+                                                                CATEGORICAL_ENCODE_TYPE)
+
+    # there must be 1_ and 0_ for each cat feat, this is wrong
+    # categorical_feats = np.array([np.concatenate((categorical_feats[0], categorical_feats[0]))])
+    if len(categorical_feats[0] == len(features['cat_cols'])):
+        # it did not add 1 and 0 for each feature
+        # new_cat_feats = np.array(categorical_feats[0])
+        reversed_cat_feats = [int(not(i)) for i in categorical_feats[0]]
+        categorical_feats = np.array([merge_lists_alternatively(categorical_feats[0], reversed_cat_feats)])
+    print('Categorical feats', len(categorical_feats))
+    print(categorical_feats)
+
+    numerical_feats = normalize_numerical_feats(numerical_feats, transformer=None)
+    agg_func = partial(agg_text_columns_func, EMPTY_TEXT_VALUES, REPLACE_EMPTY_TEXT)
+    texts_cols = get_matching_cols(data_df, text_cols_func)
+
+    texts_list = data_df[texts_cols].agg(agg_func, axis=1).tolist()
+    lemmatized_texts_list = data_df[['lemmatized']].agg(agg_func, axis=1).tolist()
+
+    for i, text in enumerate(texts_list):
+        texts_list[i] = f' {SEP_TEXT_TOKEN_STR} '.join(text)
+
+    for i, text in enumerate(lemmatized_texts_list):
+        lemmatized_texts_list[i] = f' {SEP_TEXT_TOKEN_STR} '.join(text)
+
+    logger.info(f'Raw text example: {texts_list[0]}')
+    logger.info(f'Lemmatized text example: {lemmatized_texts_list[0]}')
+
+    hf_model_text_input = tokenizer(texts_list, padding="max_length", truncation=True,
+                                    max_length=max_token_length)
+
+    tokenized_text_ex = ' '.join(tokenizer.convert_ids_to_tokens(hf_model_text_input['input_ids'][0]))
+    logger.debug(f'Tokenized text example: {tokenized_text_ex}')
+
+    answer_tokens = glove_tokenizer.texts_to_sequences(texts_list)
+    answer_tokens = pad_sequences(answer_tokens, maxlen=max_token_length, padding='post', truncating='post')
+
+    answer_lemmatized_tokens = glove_tokenizer.texts_to_sequences(lemmatized_texts_list)
+    # answer_lemmatized_tokens = [[i for i in j if i < len(glove_tokenizer.word_index)] for j in answer_lemmatized_tokens]
+    answer_lemmatized_tokens = pad_sequences(answer_lemmatized_tokens, maxlen=max_token_length, padding='post', truncating='post')
+    # create mask
+    # change to lemmatized mask
+    answer_mask = torch.zeros(answer_lemmatized_tokens.shape, dtype=torch.long)
+    # print(torch.Tensor(answer_tokens))
+    # FIXME: this is a hack to get the mask to work, I'm going to remove the part that makes it a tensor: answer_mask = torch.Tensor(answer_tokens)
+    answer_mask.masked_fill_(torch.Tensor(answer_lemmatized_tokens) != 0, 1)
+
+    keyword_tokens = glove_tokenizer.texts_to_sequences(keywords)
+    keyword_tokens = pad_sequences(keyword_tokens, maxlen=max_keyword_length, padding='post', truncating='post')
+    keyword_tokens = torch.reshape(torch.from_numpy(keyword_tokens), (len(keywords), max_keyword_length))
+    keyword_mask = torch.zeros(keyword_tokens.shape, dtype=torch.long)
+    keyword_mask.masked_fill_(keyword_tokens != 0, 1)
+
+    return TorchTabularTextDataset(hf_model_text_input, categorical_feats,
+                                numerical_feats, answer_tokens, answer_mask, keyword_tokens, keyword_mask, [0, 1, 2, 3], data_df, label_list=None, class_weights=None,
+                                texts=texts_list,
+                                lemmatized_answer_tokens=answer_lemmatized_tokens, lemmatized_answer_texts=lemmatized_texts_list)
+
 
 def load_data(data_df,
               text_cols,

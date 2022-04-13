@@ -781,7 +781,7 @@ class LongformerWithTabular(LongformerForSequenceClassification):
             if self.add_attention_module:
                 print('Combined Feat Dim is ', combined_feat_dim)
                 print('keyword MLP out dim is ', self.keyword_MLP.out_dim)
-                self.tabular_classifier = nn.Linear(combined_feat_dim + self.keyword_MLP.out_dim,
+                self.tabular_classifier = nn.Linear(combined_feat_dim + self.keyword_MLP.out_dim - 100,
                                                     tabular_config.num_labels)
             else:
                 self.tabular_classifier = nn.Linear(combined_feat_dim, tabular_config.num_labels)
@@ -810,7 +810,13 @@ class LongformerWithTabular(LongformerForSequenceClassification):
         # dangerous harcoding, fix later
         if self.add_attention_module:
             print('Vocab size is ', tabular_config.vocab_size)
-            self.embedding_layer = nn.Embedding(num_embeddings=tabular_config.vocab_size, embedding_dim=300)
+
+            # there was once an idiot named Sidharrth
+            if tabular_config.group == 'practice-a':
+                self.embedding_layer = nn.Embedding(num_embeddings=tabular_config.vocab_size, embedding_dim=300)
+            else:
+                self.embedding_layer = nn.Embedding(num_embeddings=tabular_config.vocab_size + 1, embedding_dim=300)
+
 
             self.att_layer = KeyAttention(
                 name='attention',
@@ -820,7 +826,8 @@ class LongformerWithTabular(LongformerForSequenceClassification):
                 word_att_pool='mean',
                 merge_ans_key='concat',
                 beta=False,
-                batch_size=self.batch_size
+                batch_size=self.batch_size,
+                tabular_config=tabular_config
             )
 
         # load embeddings

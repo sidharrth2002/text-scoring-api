@@ -5,7 +5,7 @@ from html import entities
 import os
 
 from dotenv import load_dotenv, find_dotenv
-from .controllers.asap import calculate_features, predict_asap
+from .controllers.asap import calculate_features_asap, predict_asap, predict_bursa
 from fastapi import FastAPI, Body
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
@@ -41,7 +41,7 @@ app = FastAPI(
 nlp = spacy.load("en_core_web_sm")
 extractor = SpacyExtractor(nlp)
 
-models = initialise_models('/Volumes/My Passport/FYP/ASAP-AES-models')
+models = initialise_models('/Volumes/My Passport/FYP/models')
 
 @app.get("/", include_in_schema=False)
 def docs_redirect():
@@ -59,11 +59,17 @@ Feature Generation
 '''
 @app.post("/asap-features")
 def get_features(text: GetFeaturesRequest):
-    return calculate_features(text.text)
+    return calculate_features_asap(text.text)
 
 @app.post("/predict-asap-aes", response_model=PredictionResponse)
-def get_features_tensor(text: PredictASAPRequest):
+def predict_asap_call(text: PredictASAPRequest):
     results = predict_asap(text.text, set_num=text.essay_set)
+    print(results)
+    return results
+
+@app.post("/predict-bursa", response_model=PredictionResponse)
+def predict_bursa_call(text: PredictASAPRequest):
+    results = predict_bursa(text.text, set_num=text.essay_set)
     print(results)
     return results
 
